@@ -150,6 +150,32 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 .loan-summary .amount{font-size:24px;font-weight:700;color:var(--loan)}
 .loan-summary .label{font-size:13px;color:var(--text-muted);margin-bottom:4px}
 
+/* Flavor Chart */
+.chart-section{margin-top:8px}
+.chart-period-select{display:flex;gap:8px;margin-bottom:16px}
+.chart-period-select .form-select{flex:1;padding:10px 12px;font-size:14px}
+.chart-bar-container{margin-bottom:10px}
+.chart-bar-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.chart-bar-name{font-weight:500}
+.chart-bar-value{color:var(--text-muted)}
+.chart-bar-track{height:28px;background:#F3F4F6;border-radius:8px;overflow:hidden;position:relative}
+.chart-bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;color:#fff;transition:width .6s ease;min-width:0}
+.chart-bar-fill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-best{background:linear-gradient(90deg,#F59E0B,#D97706)}
+.chart-normal{background:linear-gradient(90deg,#FBBF24,#F59E0B)}
+.chart-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.chart-total-box{text-align:center;padding:16px;background:var(--primary-50);border-radius:var(--radius-sm);margin-bottom:16px}
+.chart-total-box .num{font-size:28px;font-weight:700;color:var(--primary-dark)}
+.chart-total-box .lbl{font-size:13px;color:var(--text-muted);margin-top:2px}
+.chart-top-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.chart-top-card{background:var(--primary-50);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.chart-top-card .num{font-size:20px;font-weight:700;color:var(--primary-dark)}
+.chart-top-card .lbl{font-size:12px;color:var(--text-muted)}
+.chart-empty{text-align:center;padding:30px 20px;color:var(--text-muted);font-size:14px}
+.chart-size-toggle{display:flex;gap:0;border-radius:8px;overflow:hidden;border:2px solid var(--border);margin-bottom:16px}
+.chart-size-btn{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;cursor:pointer;border:none;background:#fff;color:var(--text-muted);transition:all .2s;font-family:inherit}
+.chart-size-btn.active{background:var(--primary);color:#fff}
+
 /* Print */
 .print-report{display:none}
 @media print{
@@ -191,6 +217,18 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
   </div>
   <div class="card"><div class="section-title"><span>รายการวันนี้</span><span class="section-link" id="todaySummary"></span></div><div id="todayTransactions"></div></div>
   <div class="card"><div class="section-title"><span>รายการล่าสุด</span><a class="section-link" onclick="switchPage('list')">ดูทั้งหมด →</a></div><div id="recentTransactions"></div></div>
+  <div class="card chart-section">
+    <div class="section-title"><span>🍌 สถิติยอดขายตามรสชาติ</span></div>
+    <div class="chart-period-select">
+      <select class="form-select" id="chartPeriod" onchange="loadFlavorChart()"><option value="month">เดือนนี้</option><option value="all">ทั้งหมด</option></select>
+    </div>
+    <div class="chart-size-toggle">
+      <button class="chart-size-btn active" onclick="setChartSize('all')">ทุกไซส์</button>
+      <button class="chart-size-btn" onclick="setChartSize('5')">ซอง 5 บ.</button>
+      <button class="chart-size-btn" onclick="setChartSize('10')">ซอง 10 บ.</button>
+    </div>
+    <div id="flavorChartContent"></div>
+  </div>
 </div>
 
 <!-- Add Transaction -->
@@ -469,6 +507,7 @@ async function loadDashboard() {
   document.getElementById('todaySummary').textContent = todayTxs.length ? `รับ ฿${fmt(tIn)} | จ่าย ฿${fmt(tOut)}` : '';
   renderTxList('todayTransactions', todayTxs, 'ยังไม่มีรายการวันนี้\nกดปุ่ม + เพื่อเพิ่มรายการ');
   renderTxList('recentTransactions', recentTxs, 'ยังไม่มีรายการ\nเริ่มบันทึกรายรับ-รายจ่ายเลย!');
+  loadFlavorChart();
 }
 
 function renderTxList(cid, txs, emptyMsg) {
@@ -761,19 +800,6 @@ async function generateReport() {
     }
   } else h += '<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">- ไม่มีรายรับ -</p>';
 
-  // Flavor stats
-  if (Object.keys(flavorStats).length) {
-    const sorted = Object.values(flavorStats).sort((a,b)=>(b.qty5+b.qty10)-(a.qty5+a.qty10));
-    h += `<h4 style="font-size:14px;font-weight:600;color:var(--primary-dark);margin:16px 0 8px">🍌 ยอดขายตามรสชาติ</h4>`;
-    h += '<table class="report-table"><thead><tr><th>รสชาติ</th><th>5 บาท</th><th>10 บาท</th><th>รวม</th></tr></thead><tbody>';
-    let totalQ5=0, totalQ10=0, totalRev=0;
-    sorted.forEach(f => { totalQ5+=f.qty5; totalQ10+=f.qty10; totalRev+=f.revenue;
-      h += `<tr><td>${f.name}</td><td style="text-align:center">${f.qty5}</td><td style="text-align:center">${f.qty10}</td><td>฿${fmt(f.revenue)}</td></tr>`;
-    });
-    h += `<tr class="total-row"><td>รวม</td><td style="text-align:center">${totalQ5}</td><td style="text-align:center">${totalQ10}</td><td>฿${fmt(totalRev)}</td></tr></tbody></table>`;
-    h += `<div style="margin:8px 0;font-size:13px;color:var(--income);font-weight:600">🏆 ขายดีที่สุด: ${sorted[0].name} (${sorted[0].qty5+sorted[0].qty10} ซอง)</div>`;
-  }
-
   // Expense
   h += `<h4 style="font-size:14px;font-weight:600;color:var(--expense);margin:16px 0 8px">💸 รายจ่าย</h4>`;
   if (Object.keys(exCat).length) {
@@ -799,12 +825,6 @@ async function preparePrintReport(period, inCat, exCat, totIn, totEx, profit, cn
   h += '<h3 style="font-size:16px;margin-bottom:8px">รายรับ</h3>';
   if (Object.keys(inCat).length) { h+='<table><thead><tr><th>หมวดหมู่</th><th>จำนวน</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>'; Object.values(inCat).forEach(c=>h+=`<tr><td>${c.name}</td><td>${c.count}</td><td>฿${fmt(c.total)}</td></tr>`); h+=`<tr class="total-row"><td colspan="2"><strong>รวมรายรับ</strong></td><td><strong>฿${fmt(totIn)}</strong></td></tr></tbody></table>`; }
   if (payStats && (payStats.cash||payStats.transfer)) h += `<p style="font-size:13px;margin-bottom:8px">เงินสด: ฿${fmt(payStats.cash||0)} | เงินโอน: ฿${fmt(payStats.transfer||0)}</p>`;
-  // Flavors
-  if (Object.keys(flavorStats).length) {
-    h += '<h3 style="font-size:16px;margin:16px 0 8px">ยอดขายตามรสชาติ</h3><table><thead><tr><th>รสชาติ</th><th>5 บาท</th><th>10 บาท</th><th>รวม (บาท)</th></tr></thead><tbody>';
-    Object.values(flavorStats).sort((a,b)=>(b.qty5+b.qty10)-(a.qty5+a.qty10)).forEach(f=>h+=`<tr><td>${f.name}</td><td style="text-align:center">${f.qty5}</td><td style="text-align:center">${f.qty10}</td><td>฿${fmt(f.revenue)}</td></tr>`);
-    h += '</tbody></table>';
-  }
   // Expense
   h += '<h3 style="font-size:16px;margin:16px 0 8px">รายจ่าย</h3>';
   if (Object.keys(exCat).length) { h+='<table><thead><tr><th>หมวดหมู่</th><th>จำนวน</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>'; Object.values(exCat).forEach(c=>h+=`<tr><td>${c.name}</td><td>${c.count}</td><td>฿${fmt(c.total)}</td></tr>`); h+=`<tr class="total-row"><td colspan="2"><strong>รวมรายจ่าย</strong></td><td><strong>฿${fmt(totEx)}</strong></td></tr></tbody></table>`; }
@@ -896,6 +916,80 @@ async function confirmClearData() {
   if(!confirm('ยืนยันอีกครั้ง: ข้อมูลทั้งหมดจะถูกลบถาวร'))return;
   await dbClear('transactions'); await dbClear('loans');
   showToast('ล้างข้อมูลเรียบร้อย'); closeModal('settingsModal'); loadDashboard();
+}
+
+// ===== Flavor Chart =====
+let chartSizeFilter = 'all';
+function setChartSize(s) {
+  chartSizeFilter = s;
+  document.querySelectorAll('.chart-size-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.chart-size-btn[onclick*="${s}"]`).classList.add('active');
+  loadFlavorChart();
+}
+
+async function loadFlavorChart() {
+  const period = document.getElementById('chartPeriod').value;
+  const txs = allTransactions.length ? allTransactions : await dbGetAll('transactions');
+  let filtered = txs;
+  if (period === 'month') {
+    const { start, end } = getMonthRange();
+    filtered = txs.filter(t => t.date >= start && t.date <= end);
+  }
+
+  const flavorMap = {};
+  filtered.filter(t => t.type === 'income' && t.flavors).forEach(t => {
+    t.flavors.forEach(f => {
+      flavorMap[f.id] = flavorMap[f.id] || { name: f.name, qty5: 0, qty10: 0 };
+      flavorMap[f.id].qty5 += f.qty5 || 0;
+      flavorMap[f.id].qty10 += f.qty10 || 0;
+    });
+  });
+
+  const el = document.getElementById('flavorChartContent');
+  const flavors = Object.values(flavorMap);
+  if (!flavors.length) {
+    el.innerHTML = '<div class="chart-empty">📊 ยังไม่มีข้อมูลยอดขายรสชาติ<br>เพิ่มรายรับพร้อมระบุรสชาติเพื่อดูกราฟ</div>';
+    return;
+  }
+
+  // Calculate totals based on size filter
+  flavors.forEach(f => {
+    if (chartSizeFilter === '5') f.total = f.qty5;
+    else if (chartSizeFilter === '10') f.total = f.qty10;
+    else f.total = f.qty5 + f.qty10;
+  });
+  flavors.sort((a, b) => b.total - a.total);
+  const maxQty = flavors[0].total || 1;
+  const grandTotal = flavors.reduce((s, f) => s + f.total, 0);
+  const grandRevenue = flavors.reduce((s, f) => s + f.qty5 * 5 + f.qty10 * 10, 0);
+  const colors = ['#D97706','#F59E0B','#FBBF24','#FCD34D','#FDE68A','#92400E','#B45309','#78350F','#A16207','#CA8A04'];
+
+  let h = '';
+  // Summary cards
+  h += `<div class="chart-top-row">
+    <div class="chart-top-card"><div class="num">${fmt(grandTotal)}</div><div class="lbl">ซองทั้งหมด</div></div>
+    <div class="chart-top-card"><div class="num">฿${fmt(grandRevenue)}</div><div class="lbl">ยอดขายรวม</div></div>
+  </div>`;
+
+  // Best seller
+  h += `<div style="font-size:13px;font-weight:600;color:var(--income);margin-bottom:14px;text-align:center">🏆 ขายดีสุด: ${flavors[0].name} (${fmt(flavors[0].total)} ซอง)</div>`;
+
+  // Bar chart
+  flavors.forEach((f, i) => {
+    const pct = maxQty > 0 ? (f.total / maxQty) * 100 : 0;
+    const barPct = Math.max(pct, 3); // min width for visibility
+    const colorClass = i === 0 ? 'chart-best' : 'chart-normal';
+    const sizeDetail = chartSizeFilter === 'all' ? ` (5บ:${f.qty5} | 10บ:${f.qty10})` : '';
+    h += `<div class="chart-bar-container">
+      <div class="chart-bar-label"><span class="chart-bar-name">${f.name}</span><span class="chart-bar-value">${fmt(f.total)} ซอง${sizeDetail}</span></div>
+      <div class="chart-bar-track"><div class="chart-bar-fill ${colorClass}" style="width:${barPct}%;background:${colors[i % colors.length]}"><span>${fmt(f.total)}</span></div></div>
+    </div>`;
+  });
+
+  // Legend
+  h += `<div class="chart-legend"><span>📊 ${period === 'month' ? 'เดือนนี้' : 'ทั้งหมด'} | ${flavors.length} รสชาติ</span><span>฿${fmt(grandRevenue)}</span></div>`;
+
+  el.innerHTML = h;
 }
 
 // ===== Modals =====
