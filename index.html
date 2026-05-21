@@ -6,6 +6,7 @@
 <title>บันทึกรายรับ-รายจ่าย | กล้วยทอดกรอบปรุงรส</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --primary: #D97706;
@@ -574,11 +575,14 @@ body {
 
       <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
         <h4 style="font-size:15px;font-weight:600;margin-bottom:12px;">จัดการข้อมูล</h4>
+        <button class="btn btn-success btn-sm" onclick="exportExcel()" style="margin-bottom:8px;width:100%;">
+          📊 ดาวน์โหลด Excel (.xlsx)
+        </button>
         <button class="btn btn-outline btn-sm" onclick="exportData()" style="margin-bottom:8px;width:100%;">
-          📥 สำรองข้อมูล (Export)
+          💾 สำรองข้อมูล (.json)
         </button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" style="margin-bottom:8px;width:100%;">
-          📤 นำเข้าข้อมูล (Import)
+          📤 นำเข้าข้อมูลจาก .json
         </button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
         <button class="btn btn-sm" style="background:#FEE2E2;color:var(--expense);width:100%;" onclick="confirmClearData()">
@@ -1264,6 +1268,78 @@ async function saveSettings() {
 
   showToast('บันทึกข้อมูลกิจการเรียบร้อย ✓');
   closeModal('settingsModal');
+}
+
+// ========== Export Excel ==========
+async function exportExcel() {
+  const txs = await dbGetAll('transactions');
+  if (!txs.length) { showToast('ยังไม่มีข้อมูลให้ดาวน์โหลด'); return; }
+  const settings = await getSettings();
+  const bizName = settings.businessName || 'กล้วยทอดกรอบปรุงรส';
+
+  txs.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+
+  const rows = txs.map(tx => {
+    const cat = getCategoryInfo(tx.type, tx.category);
+    return {
+      'วันที่': formatDateFull(tx.date),
+      'ประเภท': tx.type === 'income' ? 'รายรับ' : 'รายจ่าย',
+      'หมวดหมู่': cat.name,
+      'รายละเอียด': tx.description || '-',
+      'รายรับ (บาท)': tx.type === 'income' ? tx.amount : '',
+      'รายจ่าย (บาท)': tx.type === 'expense' ? tx.amount : ''
+    };
+  });
+
+  const totalIncome = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  rows.push({
+    'วันที่': '', 'ประเภท': '', 'หมวดหมู่': '',
+    'รายละเอียด': 'รวมทั้งหมด',
+    'รายรับ (บาท)': totalIncome,
+    'รายจ่าย (บาท)': totalExpense
+  });
+  rows.push({
+    'วันที่': '', 'ประเภท': '', 'หมวดหมู่': '',
+    'รายละเอียด': 'กำไร (ขาดทุน) สุทธิ',
+    'รายรับ (บาท)': totalIncome - totalExpense,
+    'รายจ่าย (บาท)': ''
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 28 }, { wch: 30 }, { wch: 16 }, { wch: 16 }];
+
+  // Summary sheet by category
+  const summaryRows = [];
+  const months = [...new Set(txs.map(t => t.date.substring(0, 7)))].sort();
+  months.forEach(m => {
+    const mTxs = txs.filter(t => t.date.startsWith(m));
+    const d = new Date(m + '-01');
+    const label = MONTH_NAMES[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    const mIncome = mTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const mExpense = mTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    summaryRows.push({
+      'เดือน': label,
+      'รายรับ (บาท)': mIncome,
+      'รายจ่าย (บาท)': mExpense,
+      'กำไร (ขาดทุน)': mIncome - mExpense
+    });
+  });
+  summaryRows.push({
+    'เดือน': 'รวมทั้งหมด',
+    'รายรับ (บาท)': totalIncome,
+    'รายจ่าย (บาท)': totalExpense,
+    'กำไร (ขาดทุน)': totalIncome - totalExpense
+  });
+
+  const ws2 = XLSX.utils.json_to_sheet(summaryRows);
+  ws2['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'รายการทั้งหมด');
+  XLSX.utils.book_append_sheet(wb, ws2, 'สรุปรายเดือน');
+  XLSX.writeFile(wb, `${bizName}-${getToday()}.xlsx`);
+  showToast('ดาวน์โหลด Excel เรียบร้อย ✓');
 }
 
 // ========== Backup / Restore ==========
