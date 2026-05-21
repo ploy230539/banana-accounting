@@ -216,7 +216,6 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
     <div class="summary-card full-width"><div class="summary-label">กำไร (ขาดทุน) เดือนนี้</div><div class="summary-value" id="monthProfit">฿0</div><div class="summary-sub" id="monthProfitSub"></div></div>
   </div>
   <div class="card"><div class="section-title"><span>รายการวันนี้</span><span class="section-link" id="todaySummary"></span></div><div id="todayTransactions"></div></div>
-  <div class="card"><div class="section-title"><span>รายการล่าสุด</span><a class="section-link" onclick="switchPage('list')">ดูทั้งหมด →</a></div><div id="recentTransactions"></div></div>
   <div class="card chart-section">
     <div class="section-title"><span>🍌 สถิติยอดขายตามรสชาติ</span></div>
     <div class="chart-period-select">
@@ -490,11 +489,10 @@ async function loadDashboard() {
   allTransactions = await dbGetAll('transactions');
   allTransactions.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
   const today = getToday(), { start, end } = getMonthRange();
-  let mIn=0, mOut=0, tIn=0, tOut=0; const todayTxs=[], recentTxs=[];
+  let mIn=0, mOut=0, tIn=0, tOut=0; const todayTxs=[];
   allTransactions.forEach(tx => {
     if (tx.date >= start && tx.date <= end) { tx.type==='income' ? mIn+=tx.amount : mOut+=tx.amount; }
     if (tx.date === today) { todayTxs.push(tx); tx.type==='income' ? tIn+=tx.amount : tOut+=tx.amount; }
-    if (recentTxs.length < 10) recentTxs.push(tx);
   });
   const profit = mIn - mOut;
   document.getElementById('monthIncome').textContent = '฿' + fmt(mIn);
@@ -506,7 +504,6 @@ async function loadDashboard() {
   document.getElementById('monthProfitSub').textContent = MONTH_NAMES[now.getMonth()] + ' ' + (now.getFullYear()+543);
   document.getElementById('todaySummary').textContent = todayTxs.length ? `รับ ฿${fmt(tIn)} | จ่าย ฿${fmt(tOut)}` : '';
   renderTxList('todayTransactions', todayTxs, 'ยังไม่มีรายการวันนี้\nกดปุ่ม + เพื่อเพิ่มรายการ');
-  renderTxList('recentTransactions', recentTxs, 'ยังไม่มีรายการ\nเริ่มบันทึกรายรับ-รายจ่ายเลย!');
   loadFlavorChart();
 }
 
