@@ -243,7 +243,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 <div id="pageDashboard" class="page active">
   <div class="summary-grid">
     <div class="summary-card"><div class="summary-label">รายรับเดือนนี้</div><div class="summary-value income" id="monthIncome">฿0</div></div>
-    <div class="summary-card"><div class="summary-label">รายจ่ายเดือนนี้</div><div class="summary-value expense" id="monthExpense">฿0</div></div>
+    <div class="summary-card" onclick="showCostBreakdown()" style="cursor:pointer"><div class="summary-label">รายจ่ายเดือนนี้ <span style="font-size:14px">📊</span></div><div class="summary-value expense" id="monthExpense">฿0</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">แตะเพื่อดูแยกหมวด</div></div>
     <div class="summary-card full-width"><div class="summary-label">กำไร (ขาดทุน) เดือนนี้</div><div class="summary-value" id="monthProfit">฿0</div><div class="summary-sub" id="monthProfitSub"></div></div>
   </div>
   <div class="card"><div class="section-title"><span>รายการวันนี้</span><span class="section-link" id="todaySummary"></span></div><div id="todayTransactions"></div></div>
@@ -368,6 +368,9 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
   <button class="btn btn-loan" onclick="saveLoan()" id="saveLoanBtn">บันทึกเงินกู้</button>
   <input type="hidden" id="editLoanId" value="">
 </div></div></div>
+
+<!-- Cost Breakdown Modal -->
+<div class="modal-overlay" id="costModal"><div class="modal"><div class="modal-header"><h3>📊 ต้นทุนเดือนนี้</h3><button class="modal-close" onclick="closeModal('costModal')">✕</button></div><div class="modal-body" id="costBreakdownBody"></div></div></div>
 
 <div class="print-report" id="printReport"></div>
 <div class="toast" id="toast"></div>
@@ -975,6 +978,45 @@ async function confirmClearData() {
   if(!confirm('ยืนยันอีกครั้ง: ข้อมูลทั้งหมดจะถูกลบถาวร'))return;
   await dbClear('transactions'); await dbClear('loans');
   showToast('ล้างข้อมูลเรียบร้อย'); closeModal('settingsModal'); loadDashboard();
+}
+
+// ===== Cost Breakdown =====
+async function showCostBreakdown() {
+  const txs = allTransactions.length ? allTransactions : await dbGetAll('transactions');
+  const { start, end } = getMonthRange();
+  const monthTxs = txs.filter(t => t.type === 'expense' && t.date >= start && t.date <= end);
+  const catTotals = {};
+  let grandTotal = 0;
+  monthTxs.forEach(tx => {
+    const cat = getCat('expense', tx.category);
+    catTotals[tx.category] = catTotals[tx.category] || { name: cat.name, icon: cat.icon, total: 0, count: 0 };
+    catTotals[tx.category].total += tx.amount;
+    catTotals[tx.category].count++;
+    grandTotal += tx.amount;
+  });
+  const sorted = Object.values(catTotals).sort((a, b) => b.total - a.total);
+  const now = new Date();
+  const periodLabel = MONTH_NAMES[now.getMonth()] + ' ' + (now.getFullYear() + 543);
+
+  let h = `<div style="text-align:center;margin-bottom:16px"><div style="font-size:13px;color:var(--text-muted)">${periodLabel}</div><div style="font-size:28px;font-weight:700;color:var(--expense)">฿${fmt(grandTotal)}</div><div style="font-size:12px;color:var(--text-muted)">${monthTxs.length} รายการ</div></div>`;
+  if (!sorted.length) {
+    h += '<div style="text-align:center;color:var(--text-muted);padding:20px">ยังไม่มีรายจ่ายเดือนนี้</div>';
+  } else {
+    sorted.forEach(c => {
+      const pct = grandTotal > 0 ? (c.total / grandTotal * 100) : 0;
+      h += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F3F4F6">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--expense-light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${c.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${c.name}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${c.count} รายการ · ${pct.toFixed(0)}%</div>
+          <div style="height:6px;background:#F3F4F6;border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--expense);border-radius:3px"></div></div>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:var(--expense);flex-shrink:0">฿${fmt(c.total)}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('costBreakdownBody').innerHTML = h;
+  openModal('costModal');
 }
 
 // ===== Flavor Chart =====
