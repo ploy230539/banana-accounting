@@ -292,7 +292,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
         <img id="photoPreview" class="photo-preview" style="display:none">
         <button id="photoRemoveBtn" class="photo-remove" style="display:none" onclick="event.stopPropagation();removePhoto()">✕</button>
       </div>
-      <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(event)">
+      <input type="file" id="photoInput" accept="image/*" onchange="handlePhoto(event)">
     </div>
     <button class="btn btn-primary" onclick="saveTransaction()" id="saveBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>บันทึกรายการ</button>
     <input type="hidden" id="editId" value="">
