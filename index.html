@@ -320,7 +320,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
     <div class="report-selector"><select class="form-select" id="reportType" onchange="generateReport()"><option value="monthly">รายเดือน</option><option value="yearly">รายปี</option></select><select class="form-select" id="reportMonth" onchange="generateReport()"></select><select class="form-select" id="reportYear" onchange="generateReport()"></select></div>
   </div>
   <div class="card" id="reportContent"><div class="empty-state"><div class="emoji">📊</div><p>เลือกช่วงเวลาเพื่อดูรีพอร์ต</p></div></div>
-  <div class="report-actions" id="reportActions" style="display:none"><button class="btn btn-primary" onclick="printReport()">🖨 พิมพ์ / บันทึก PDF</button></div>
+  <div class="report-actions" id="reportActions" style="display:none"><button class="btn btn-success" onclick="exportReportExcel()">📊 ส่งออก Excel</button><button class="btn btn-primary" onclick="printReport()">🖨 พิมพ์ PDF</button></div>
 </div>
 
 <!-- Bottom Nav -->
@@ -883,6 +883,7 @@ async function generateReport() {
 
   document.getElementById('reportContent').innerHTML = h;
   document.getElementById('reportActions').style.display = 'flex';
+  lastReportData = { periodLabel, inCat, exCat, totIn, totEx, profit, count: filtered.length, flavorStats, payStats, filtered };
   preparePrintReport(periodLabel, inCat, exCat, totIn, totEx, profit, filtered.length, flavorStats, payStats);
 }
 
@@ -905,6 +906,65 @@ async function preparePrintReport(period, inCat, exCat, totIn, totEx, profit, cn
   document.getElementById('printReport').innerHTML = h;
 }
 function printReport() { window.print(); }
+
+let lastReportData = null;
+async function exportReportExcel() {
+  if (!lastReportData) { showToast('กรุณาสร้างรีพอร์ตก่อน'); return; }
+  const d = lastReportData, s = await getSettings();
+  const biz = s.businessName || 'กล้วยทอดกรอบปรุงรส';
+
+  // Sheet 1: Summary
+  const summaryRows = [];
+  summaryRows.push({'':'รายงานรายรับ-รายจ่าย - '+biz});
+  summaryRows.push({'':'งวด: '+d.periodLabel, ' ':'จำนวนรายการ: '+d.count+' รายการ'});
+  summaryRows.push({});
+
+  // Income section
+  summaryRows.push({'':'💰 รายรับ'});
+  summaryRows.push({'':'หมวดหมู่', ' ':'จำนวน', '  ':'ยอดรวม (บาท)'});
+  Object.values(d.inCat).forEach(c => summaryRows.push({'':c.icon+' '+c.name, ' ':c.count+' รายการ', '  ':c.total}));
+  summaryRows.push({'':'รวมรายรับ', ' ':'', '  ':d.totIn});
+  if (d.payStats.cash || d.payStats.transfer) summaryRows.push({'':'เงินสด: ฿'+fmt(d.payStats.cash||0)+' | เงินโอน: ฿'+fmt(d.payStats.transfer||0)});
+  summaryRows.push({});
+
+  // Expense section
+  summaryRows.push({'':'💸 รายจ่าย'});
+  summaryRows.push({'':'หมวดหมู่', ' ':'จำนวน', '  ':'ยอดรวม (บาท)'});
+  Object.values(d.exCat).forEach(c => summaryRows.push({'':c.icon+' '+c.name, ' ':c.count+' รายการ', '  ':c.total}));
+  summaryRows.push({'':'รวมรายจ่าย', ' ':'', '  ':d.totEx});
+  summaryRows.push({});
+  summaryRows.push({'':'กำไร (ขาดทุน) สุทธิ', ' ':'', '  ':d.profit});
+
+  const ws1 = XLSX.utils.json_to_sheet(summaryRows, {skipHeader:true});
+  ws1['!cols'] = [{wch:30},{wch:18},{wch:18}];
+
+  // Sheet 2: All transactions detail
+  const txRows = d.filtered.sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).map(tx => {
+    const cat = getCat(tx.type, tx.category);
+    const flavorStr = (tx.flavors||[]).map(f=>`${f.name}(4บ:${f.qty5||0},8บ:${f.qty10||0})`).join(', ');
+    return {'วันที่':fmtDateFull(tx.date),'ประเภท':tx.type==='income'?'รายรับ':'รายจ่าย','หมวดหมู่':cat.name,'ลูกค้า':tx.customerName||'','ชำระเงิน':tx.paymentMethod==='transfer'?'เงินโอน':tx.paymentMethod==='cash'?'เงินสด':'','รสชาติ':flavorStr,'รายละเอียด':tx.description||'-','รายรับ (บาท)':tx.type==='income'?tx.amount:'','รายจ่าย (บาท)':tx.type==='expense'?tx.amount:''};
+  });
+  txRows.push({'วันที่':'','ประเภท':'','หมวดหมู่':'','ลูกค้า':'','ชำระเงิน':'','รสชาติ':'','รายละเอียด':'รวมทั้งหมด','รายรับ (บาท)':d.totIn,'รายจ่าย (บาท)':d.totEx});
+  txRows.push({'วันที่':'','ประเภท':'','หมวดหมู่':'','ลูกค้า':'','ชำระเงิน':'','รสชาติ':'','รายละเอียด':'กำไร (ขาดทุน) สุทธิ','รายรับ (บาท)':d.profit,'รายจ่าย (บาท)':''});
+  const ws2 = XLSX.utils.json_to_sheet(txRows);
+  ws2['!cols']=[{wch:22},{wch:10},{wch:22},{wch:18},{wch:10},{wch:40},{wch:30},{wch:16},{wch:16}];
+
+  // Sheet 3: Flavor stats
+  const flavorMap = {};
+  d.filtered.filter(t=>t.flavors).forEach(t=>t.flavors.forEach(f=>{
+    flavorMap[f.id]=flavorMap[f.id]||{name:f.name,qty5:0,qty10:0};
+    flavorMap[f.id].qty5+=f.qty5||0; flavorMap[f.id].qty10+=f.qty10||0;
+  }));
+  const flavorRows = Object.values(flavorMap).sort((a,b)=>(b.qty5+b.qty10)-(a.qty5+a.qty10)).map(f=>({'รสชาติ':f.name,'ซอง 4 บาท':f.qty5,'ซอง 8 บาท':f.qty10,'รวมซอง':f.qty5+f.qty10,'ยอดขาย (บาท)':f.qty5*4+f.qty10*8}));
+  const ws3 = XLSX.utils.json_to_sheet(flavorRows.length?flavorRows:[{'รสชาติ':'ยังไม่มีข้อมูล'}]);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'สรุปรีพอร์ต');
+  XLSX.utils.book_append_sheet(wb, ws2, 'รายการทั้งหมด');
+  XLSX.utils.book_append_sheet(wb, ws3, 'สถิติรสชาติ');
+  XLSX.writeFile(wb, biz+'_รีพอร์ต_'+d.periodLabel.replace(/ /g,'_')+'.xlsx');
+  showToast('ส่งออก Excel สำเร็จ!');
+}
 
 // ===== Settings =====
 async function getSettings() { const keys=['businessName','ownerName','address','phone'], r={}; for(const k of keys){const row=await dbGet('settings',k);r[k]=row?row.value:'';} return r; }
