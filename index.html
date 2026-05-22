@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 :root{--primary:#D97706;--primary-dark:#92400E;--primary-light:#FEF3C7;--primary-50:#FFFBEB;--income:#059669;--income-light:#D1FAE5;--expense:#DC2626;--expense-light:#FEE2E2;--loan:#7C3AED;--loan-light:#EDE9FE;--bg:#FFF8E7;--card:#FFF;--text:#1F2937;--text-muted:#6B7280;--border:#E5E7EB;--shadow:0 2px 8px rgba(0,0,0,.08);--shadow-lg:0 4px 16px rgba(0,0,0,.12);--radius:16px;--radius-sm:10px;--nav-height:70px;--header-height:60px}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -150,6 +153,21 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 .loan-summary .amount{font-size:24px;font-weight:700;color:var(--loan)}
 .loan-summary .label{font-size:13px;color:var(--text-muted);margin-bottom:4px}
 
+/* Login */
+.login-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:linear-gradient(135deg,#FEF3C7,#FDE68A);display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:var(--radius);padding:40px 32px;text-align:center;box-shadow:var(--shadow-lg);max-width:360px;width:100%}
+.login-logo{font-size:64px;margin-bottom:12px}
+.login-title{font-size:22px;font-weight:700;color:var(--primary-dark);margin-bottom:4px}
+.login-subtitle{font-size:14px;color:var(--text-muted);margin-bottom:32px}
+.btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:var(--text);transition:all .2s}
+.btn-google:hover{border-color:var(--primary);background:var(--primary-50)}
+.login-note{font-size:12px;color:var(--text-muted);margin-top:20px}
+.user-info{display:flex;align-items:center;gap:12px;padding:12px;background:var(--primary-50);border-radius:var(--radius-sm);margin-bottom:16px}
+.user-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover}
+.user-detail{text-align:left}
+.user-name{font-size:14px;font-weight:600}
+.user-email{font-size:12px;color:var(--text-muted)}
+
 /* Flavor Chart */
 .chart-section{margin-top:8px}
 .chart-period-select{display:flex;gap:8px;margin-bottom:16px}
@@ -202,6 +220,19 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 </style>
 </head>
 <body>
+
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">🍌</div>
+    <h1 class="login-title">กล้วยทอดกรอบปรุงรส</h1>
+    <p class="login-subtitle">บันทึกรายรับ-รายจ่าย</p>
+    <button class="btn-google" onclick="googleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google">
+      ล็อกอินด้วย Google
+    </button>
+    <p class="login-note">🔄 ข้อมูลจะ sync ทุกเครื่องอัตโนมัติ</p>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-title"><span class="header-logo">🍌</span><span>กล้วยทอดกรอบปรุงรส</span></div>
@@ -303,6 +334,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 
 <!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal"><div class="modal"><div class="modal-header"><h3>⚙ ตั้งค่ากิจการ</h3><button class="modal-close" onclick="closeModal('settingsModal')">✕</button></div><div class="modal-body">
+  <div id="userInfoBox"></div>
   <div class="form-group"><label class="form-label">ชื่อกิจการ</label><input type="text" class="form-input" id="setBizName" placeholder="กล้วยทอดกรอบปรุงรส"></div>
   <div class="form-group"><label class="form-label">ชื่อเจ้าของ</label><input type="text" class="form-input" id="setOwner" placeholder="ชื่อ-นามสกุล"></div>
   <div class="form-group"><label class="form-label">ที่อยู่</label><textarea class="form-textarea" id="setAddress" placeholder="ที่อยู่กิจการ" rows="2"></textarea></div>
@@ -374,44 +406,67 @@ const FLAVORS = [
 const MONTH_NAMES = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const MONTH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-// ===== DB =====
-const DB_NAME = 'BananaAccounting';
-const DB_VERSION = 2;
-let db = null;
+// ===== Firebase =====
+const firebaseConfig = {
+  apiKey: "AIzaSyBcH4HQ0cxLBrX16NTPzp5wPGTM3kXrs4Q",
+  authDomain: "banana-accounting.firebaseapp.com",
+  projectId: "banana-accounting",
+  storageBucket: "banana-accounting.firebasestorage.app",
+  messagingSenderId: "893908740299",
+  appId: "1:893908740299:web:de63339a2acaf9eb80534e"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const fsDb = firebase.firestore();
+fsDb.enablePersistence().catch(()=>{});
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const d = e.target.result;
-      if (e.oldVersion < 1) {
-        const s = d.createObjectStore('transactions', { keyPath: 'id', autoIncrement: true });
-        s.createIndex('date', 'date'); s.createIndex('type', 'type'); s.createIndex('category', 'category');
-        d.createObjectStore('settings', { keyPath: 'key' });
-      }
-      if (e.oldVersion < 2) {
-        if (!d.objectStoreNames.contains('loans')) d.createObjectStore('loans', { keyPath: 'id', autoIncrement: true });
-      }
-    };
-    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-    req.onerror = (e) => reject(e.target.error);
-  });
+let currentUser = null;
+
+function getCol(store) {
+  return fsDb.collection('users').doc(currentUser.uid).collection(store);
 }
 
-function dbOp(store, mode, fn) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, mode);
-    const r = fn(tx.objectStore(store));
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
-  });
+async function dbAdd(store, data) {
+  if (store === 'settings') { await getCol(store).doc(data.key).set(data); return data.key; }
+  if (!data.id) data.id = Date.now() + Math.floor(Math.random() * 10000);
+  await getCol(store).doc(String(data.id)).set(data);
+  return data.id;
 }
-const dbAdd = (s, d) => dbOp(s, 'readwrite', st => st.add(d));
-const dbPut = (s, d) => dbOp(s, 'readwrite', st => st.put(d));
-const dbGet = (s, k) => dbOp(s, 'readonly', st => st.get(k));
-const dbGetAll = (s) => dbOp(s, 'readonly', st => st.getAll());
-const dbDelete = (s, k) => dbOp(s, 'readwrite', st => st.delete(k));
-const dbClear = (s) => dbOp(s, 'readwrite', st => st.clear());
+async function dbPut(store, data) {
+  const id = store === 'settings' ? data.key : String(data.id);
+  await getCol(store).doc(id).set(data);
+}
+async function dbGet(store, key) {
+  const doc = await getCol(store).doc(String(key)).get();
+  return doc.exists ? doc.data() : undefined;
+}
+async function dbGetAll(store) {
+  const snap = await getCol(store).get();
+  return snap.docs.map(d => d.data());
+}
+async function dbDelete(store, key) {
+  await getCol(store).doc(String(key)).delete();
+}
+async function dbClear(store) {
+  const snap = await getCol(store).get();
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += 500) {
+    const batch = fsDb.batch();
+    docs.slice(i, i + 500).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+function googleLogin() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) { auth.signInWithRedirect(provider); }
+  else { auth.signInWithPopup(provider).catch(() => auth.signInWithRedirect(provider)); }
+}
+function logout() {
+  if (!confirm('ต้องการออกจากระบบ?')) return;
+  auth.signOut().then(() => location.reload());
+}
 
 // ===== State =====
 let currentPage = 'dashboard', currentType = 'expense', currentFilter = 'all';
@@ -834,7 +889,14 @@ function printReport() { window.print(); }
 
 // ===== Settings =====
 async function getSettings() { const keys=['businessName','ownerName','address','phone'], r={}; for(const k of keys){const row=await dbGet('settings',k);r[k]=row?row.value:'';} return r; }
-async function openSettings() { const s=await getSettings(); document.getElementById('setBizName').value=s.businessName||'กล้วยทอดกรอบปรุงรส'; document.getElementById('setOwner').value=s.ownerName||''; document.getElementById('setAddress').value=s.address||''; document.getElementById('setPhone').value=s.phone||''; openModal('settingsModal'); }
+async function openSettings() {
+  const s=await getSettings();
+  document.getElementById('setBizName').value=s.businessName||'กล้วยทอดกรอบปรุงรส'; document.getElementById('setOwner').value=s.ownerName||''; document.getElementById('setAddress').value=s.address||''; document.getElementById('setPhone').value=s.phone||'';
+  if (currentUser) {
+    document.getElementById('userInfoBox').innerHTML = `<div class="user-info"><img class="user-avatar" src="${currentUser.photoURL||''}" alt="" onerror="this.style.display='none'"><div class="user-detail"><div class="user-name">${currentUser.displayName||'ผู้ใช้'}</div><div class="user-email">${currentUser.email||''}</div></div></div><button class="btn btn-sm" style="background:#FEE2E2;color:var(--expense);width:100%;margin-bottom:16px" onclick="logout()">🚪 ออกจากระบบ</button>`;
+  }
+  openModal('settingsModal');
+}
 async function saveSettings() {
   await dbPut('settings',{key:'businessName',value:document.getElementById('setBizName').value.trim()});
   await dbPut('settings',{key:'ownerName',value:document.getElementById('setOwner').value.trim()});
@@ -995,8 +1057,7 @@ function closeModal(id){document.getElementById(id).classList.remove('active')}
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('active')}));
 
 // ===== Init =====
-async function init() {
-  await openDB();
+async function initApp() {
   document.getElementById('dateInput').value = getToday();
   updateCategoryOptions(); buildFlavorGrid();
   const s=await getSettings();
@@ -1006,7 +1067,12 @@ async function init() {
   document.getElementById('filterDateTo').value=end;
   loadDashboard();
 }
-init();
+
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  document.getElementById('loginOverlay').style.display = user ? 'none' : 'flex';
+  if (user) initApp();
+});
 </script>
 </body>
 </html>
