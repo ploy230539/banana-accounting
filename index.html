@@ -254,8 +254,8 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
     </div>
     <div class="chart-size-toggle">
       <button class="chart-size-btn active" onclick="setChartSize('all')">ทุกไซส์</button>
-      <button class="chart-size-btn" onclick="setChartSize('5')">ซอง 5 บ.</button>
-      <button class="chart-size-btn" onclick="setChartSize('10')">ซอง 10 บ.</button>
+      <button class="chart-size-btn" onclick="setChartSize('4')">ซอง 4 บ.</button>
+      <button class="chart-size-btn" onclick="setChartSize('8')">ซอง 8 บ.</button>
     </div>
     <div id="flavorChartContent"></div>
   </div>
@@ -275,7 +275,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
       <div class="form-group">
         <label class="form-label">📊 รายละเอียดสินค้าตามรสชาติ</label>
         <div class="flavor-grid">
-          <div class="flavor-header"><span>รสชาติ</span><span>5 บาท</span><span>10 บาท</span></div>
+          <div class="flavor-header"><span>รสชาติ</span><span>4 บาท</span><span>8 บาท</span></div>
           <div id="flavorRows"></div>
           <div class="flavor-total"><span id="flavorTotalQty">รวม: 0 ซอง</span><span id="flavorTotalAmt">฿0</span></div>
         </div>
@@ -383,6 +383,8 @@ const CATEGORIES = {
     { id: 'oil', name: 'น้ำมันปาล์ม', icon: '🫗' },
     { id: 'bag', name: 'ถุง / บรรจุภัณฑ์', icon: '🛍️' },
     { id: 'fuel', name: 'เติมน้ำมันเดินทาง', icon: '⛽' },
+    { id: 'gas_ice', name: 'แก๊สหุงต้ม / น้ำแข็ง', icon: '🔥' },
+    { id: 'labor', name: 'ค่าแรง', icon: '👷' },
     { id: 'loan_payment', name: 'ค่าผ่อนเงินกู้', icon: '🏦' },
     { id: 'other_exp', name: 'อื่นๆ', icon: '📦' }
   ],
@@ -517,7 +519,7 @@ function switchPage(page) {
 // ===== Flavor Grid =====
 function buildFlavorGrid() {
   document.getElementById('flavorRows').innerHTML = FLAVORS.map(f =>
-    `<div class="flavor-row"><span>${f.name}</span><input type="number" class="flavor-qty" data-flavor="${f.id}" data-size="5" min="0" value="0" inputmode="numeric" onchange="calcFlavors()"><input type="number" class="flavor-qty" data-flavor="${f.id}" data-size="10" min="0" value="0" inputmode="numeric" onchange="calcFlavors()"></div>`
+    `<div class="flavor-row"><span>${f.name}</span><input type="number" class="flavor-qty" data-flavor="${f.id}" data-size="4" min="0" value="0" inputmode="numeric" onchange="calcFlavors()"><input type="number" class="flavor-qty" data-flavor="${f.id}" data-size="8" min="0" value="0" inputmode="numeric" onchange="calcFlavors()"></div>`
   ).join('');
 }
 
@@ -537,8 +539,8 @@ function calcFlavors() {
 function getFlavorData() {
   const flavors = [];
   FLAVORS.forEach(f => {
-    const q5 = parseInt(document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="5"]`)?.value) || 0;
-    const q10 = parseInt(document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="10"]`)?.value) || 0;
+    const q5 = parseInt(document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="4"]`)?.value) || 0;
+    const q10 = parseInt(document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="8"]`)?.value) || 0;
     if (q5 || q10) flavors.push({ id: f.id, name: f.name, qty5: q5, qty10: q10 });
   });
   return flavors;
@@ -548,8 +550,8 @@ function setFlavorData(flavors) {
   document.querySelectorAll('.flavor-qty').forEach(el => el.value = 0);
   if (!flavors) return;
   flavors.forEach(f => {
-    const el5 = document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="5"]`);
-    const el10 = document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="10"]`);
+    const el5 = document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="4"]`);
+    const el10 = document.querySelector(`.flavor-qty[data-flavor="${f.id}"][data-size="8"]`);
     if (el5) el5.value = f.qty5 || 0;
     if (el10) el10.value = f.qty10 || 0;
   });
@@ -679,7 +681,7 @@ async function showDetail(id) {
   if (tx.paymentMethod) h += `<div class="detail-row"><span class="detail-label">ชำระเงิน</span><span class="detail-value">${tx.paymentMethod==='cash'?'💵 เงินสด':'📲 เงินโอน'}</span></div>`;
   h += `<div class="detail-row"><span class="detail-label">รายละเอียด</span><span class="detail-value">${tx.description||'-'}</span></div>`;
   if (tx.flavors && tx.flavors.length) {
-    h += '<div style="margin-top:12px;font-size:14px;font-weight:600;">📊 สินค้าตามรสชาติ</div><table class="report-table" style="margin-top:8px;font-size:13px"><thead><tr><th>รสชาติ</th><th>5 บาท</th><th>10 บาท</th></tr></thead><tbody>';
+    h += '<div style="margin-top:12px;font-size:14px;font-weight:600;">📊 สินค้าตามรสชาติ</div><table class="report-table" style="margin-top:8px;font-size:13px"><thead><tr><th>รสชาติ</th><th>4 บาท</th><th>8 บาท</th></tr></thead><tbody>';
     tx.flavors.forEach(f => { h += `<tr><td>${f.name}</td><td style="text-align:center">${f.qty5||0}</td><td style="text-align:center">${f.qty10||0}</td></tr>`; });
     h += '</tbody></table>';
   }
@@ -845,7 +847,7 @@ async function generateReport() {
       if (tx.flavors) tx.flavors.forEach(f => {
         flavorStats[f.id] = flavorStats[f.id] || {name:f.name, qty5:0, qty10:0, revenue:0};
         flavorStats[f.id].qty5 += f.qty5||0; flavorStats[f.id].qty10 += f.qty10||0;
-        flavorStats[f.id].revenue += (f.qty5||0)*5 + (f.qty10||0)*10;
+        flavorStats[f.id].revenue += (f.qty5||0)*4 + (f.qty10||0)*8;
       });
     } else {
       exCat[tx.category] = exCat[tx.category] || {name:cat.name,icon:cat.icon,total:0,count:0};
@@ -933,7 +935,7 @@ async function exportExcel() {
 
   const rows = txs.map(tx => {
     const cat = getCat(tx.type, tx.category);
-    const flavorStr = (tx.flavors||[]).map(f=>`${f.name}(5บ:${f.qty5||0},10บ:${f.qty10||0})`).join(', ');
+    const flavorStr = (tx.flavors||[]).map(f=>`${f.name}(4บ:${f.qty5||0},8บ:${f.qty10||0})`).join(', ');
     return { 'วันที่':fmtDateFull(tx.date), 'ประเภท':tx.type==='income'?'รายรับ':'รายจ่าย', 'หมวดหมู่':cat.name, 'ลูกค้า':tx.customerName||'', 'ชำระเงิน':tx.paymentMethod==='transfer'?'เงินโอน':tx.paymentMethod==='cash'?'เงินสด':'', 'รสชาติ':flavorStr, 'รายละเอียด':tx.description||'-', 'รายรับ (บาท)':tx.type==='income'?tx.amount:'', 'รายจ่าย (บาท)':tx.type==='expense'?tx.amount:'' };
   });
   const totIn=txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0), totEx=txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
@@ -949,7 +951,7 @@ async function exportExcel() {
     flavorMap[f.id]=flavorMap[f.id]||{name:f.name,qty5:0,qty10:0};
     flavorMap[f.id].qty5+=f.qty5||0; flavorMap[f.id].qty10+=f.qty10||0;
   }));
-  const flavorRows = Object.values(flavorMap).sort((a,b)=>(b.qty5+b.qty10)-(a.qty5+a.qty10)).map(f=>({'รสชาติ':f.name,'ซอง 5 บาท':f.qty5,'ซอง 10 บาท':f.qty10,'รวมซอง':f.qty5+f.qty10,'ยอดขาย (บาท)':f.qty5*5+f.qty10*10}));
+  const flavorRows = Object.values(flavorMap).sort((a,b)=>(b.qty5+b.qty10)-(a.qty5+a.qty10)).map(f=>({'รสชาติ':f.name,'ซอง 4 บาท':f.qty5,'ซอง 8 บาท':f.qty10,'รวมซอง':f.qty5+f.qty10,'ยอดขาย (บาท)':f.qty5*4+f.qty10*8}));
   const ws3 = XLSX.utils.json_to_sheet(flavorRows.length?flavorRows:[{'รสชาติ':'ยังไม่มีข้อมูล'}]);
 
   // Monthly summary
@@ -1069,14 +1071,14 @@ async function loadFlavorChart() {
 
   // Calculate totals based on size filter
   flavors.forEach(f => {
-    if (chartSizeFilter === '5') f.total = f.qty5;
-    else if (chartSizeFilter === '10') f.total = f.qty10;
+    if (chartSizeFilter === '4') f.total = f.qty5;
+    else if (chartSizeFilter === '8') f.total = f.qty10;
     else f.total = f.qty5 + f.qty10;
   });
   flavors.sort((a, b) => b.total - a.total);
   const maxQty = flavors[0].total || 1;
   const grandTotal = flavors.reduce((s, f) => s + f.total, 0);
-  const grandRevenue = flavors.reduce((s, f) => s + f.qty5 * 5 + f.qty10 * 10, 0);
+  const grandRevenue = flavors.reduce((s, f) => s + f.qty5 * 4 + f.qty10 * 8, 0);
   const colors = ['#D97706','#F59E0B','#FBBF24','#FCD34D','#FDE68A','#92400E','#B45309','#78350F','#A16207','#CA8A04'];
 
   let h = '';
@@ -1094,7 +1096,7 @@ async function loadFlavorChart() {
     const pct = maxQty > 0 ? (f.total / maxQty) * 100 : 0;
     const barPct = Math.max(pct, 3); // min width for visibility
     const colorClass = i === 0 ? 'chart-best' : 'chart-normal';
-    const sizeDetail = chartSizeFilter === 'all' ? ` (5บ:${f.qty5} | 10บ:${f.qty10})` : '';
+    const sizeDetail = chartSizeFilter === 'all' ? ` (4บ:${f.qty5} | 8บ:${f.qty10})` : '';
     h += `<div class="chart-bar-container">
       <div class="chart-bar-label"><span class="chart-bar-name">${f.name}</span><span class="chart-bar-value">${fmt(f.total)} ซอง${sizeDetail}</span></div>
       <div class="chart-bar-track"><div class="chart-bar-fill ${colorClass}" style="width:${barPct}%;background:${colors[i % colors.length]}"><span>${fmt(f.total)}</span></div></div>
