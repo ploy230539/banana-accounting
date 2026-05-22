@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>บันทึกรายรับ-รายจ่าย | กล้วยทอดกรอบปรุงรส</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#D97706">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="กล้วยทอด">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -1191,6 +1197,37 @@ auth.onAuthStateChanged(user => {
   document.getElementById('loginOverlay').style.display = user ? 'none' : 'flex';
   if (user) initApp();
 });
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    console.log('SW registered:', reg.scope);
+  }).catch(err => console.log('SW failed:', err));
+}
+
+// PWA Install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show install banner
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;background:linear-gradient(135deg,#D97706,#B45309);color:#fff;padding:14px 16px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;z-index:300;box-shadow:0 4px 20px rgba(217,119,6,.4);font-family:Prompt,sans-serif;animation:slideUp .3s ease';
+  banner.innerHTML = '<div style="flex:1"><div style="font-weight:600;font-size:14px">📲 ติดตั้งแอปลงมือถือ</div><div style="font-size:12px;opacity:.9;margin-top:2px">เปิดใช้งานได้เหมือนแอปจริง</div></div><button onclick="installPWA()" style="background:#fff;color:#D97706;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:Prompt,sans-serif">ติดตั้ง</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;margin-left:8px;padding:4px">✕</button>';
+  document.body.appendChild(banner);
+});
+
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(result => {
+    if (result.outcome === 'accepted') showToast('ติดตั้งแอปสำเร็จ!');
+    deferredPrompt = null;
+    const b = document.getElementById('installBanner');
+    if (b) b.remove();
+  });
+}
 </script>
 </body>
 </html>

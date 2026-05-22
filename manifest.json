@@ -1,0 +1,26 @@
+{
+  "name": "บันทึกรายรับ-รายจ่าย กล้วยทอดกรอบปรุงรส",
+  "short_name": "กล้วยทอด",
+  "description": "แอปบันทึกรายรับ-รายจ่ายสำหรับกิจการกล้วยทอดกรอบปรุงรส",
+  "start_url": "/banana-accounting/",
+  "scope": "/banana-accounting/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF8E7",
+  "theme_color": "#D97706",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
