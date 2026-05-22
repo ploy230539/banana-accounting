@@ -462,10 +462,24 @@ async function dbClear(store) {
 
 function googleLogin() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) { auth.signInWithRedirect(provider); }
-  else { auth.signInWithPopup(provider).catch(() => auth.signInWithRedirect(provider)); }
+  document.querySelector('.btn-google').textContent = '⏳ กำลังเปิดหน้าล็อกอิน...';
+  auth.signInWithPopup(provider).catch(err => {
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+      auth.signInWithRedirect(provider);
+    } else {
+      document.querySelector('.btn-google').textContent = '❌ ล็อกอินไม่สำเร็จ ลองอีกครั้ง';
+      setTimeout(() => { document.querySelector('.btn-google').innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google"> ล็อกอินด้วย Google'; }, 3000);
+      console.error('Login error:', err.code, err.message);
+    }
+  });
 }
+// Handle redirect result (for mobile browsers that use redirect)
+auth.getRedirectResult().then(result => {
+  if (result.user) console.log('Redirect login success');
+}).catch(err => {
+  if (err.code) console.error('Redirect error:', err.code, err.message);
+});
+
 function logout() {
   if (!confirm('ต้องการออกจากระบบ?')) return;
   auth.signOut().then(() => location.reload());
