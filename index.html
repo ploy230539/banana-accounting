@@ -347,6 +347,10 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
   <div class="form-group"><label class="form-label">เบอร์โทรศัพท์</label><input type="tel" class="form-input" id="setPhone" placeholder="0xx-xxx-xxxx"></div>
   <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:16px">บันทึกข้อมูลกิจการ</button>
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
+    <h4 style="font-size:15px;font-weight:600;margin-bottom:12px">จัดการหมวดหมู่</h4>
+    <button class="btn btn-outline btn-sm" onclick="closeModal('settingsModal');openCategoryManager()" style="margin-bottom:8px;width:100%">🏷 จัดการหมวดรายรับ-รายจ่าย</button>
+  </div>
+  <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
     <h4 style="font-size:15px;font-weight:600;margin-bottom:12px">จัดการข้อมูล</h4>
     <button class="btn btn-success btn-sm" onclick="exportExcel()" style="margin-bottom:8px;width:100%">📊 ดาวน์โหลด Excel (.xlsx)</button>
     <button class="btn btn-outline btn-sm" onclick="exportData()" style="margin-bottom:8px;width:100%">💾 สำรองข้อมูล (.json)</button>
@@ -376,13 +380,16 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
 </div></div></div>
 
 <!-- Cost Breakdown Modal -->
+<!-- Category Manager Modal -->
+<div class="modal-overlay" id="categoryModal"><div class="modal"><div class="modal-header"><h3>🏷 จัดการหมวดหมู่</h3><button class="modal-close" onclick="closeModal('categoryModal')">✕</button></div><div class="modal-body" id="categoryModalBody"></div></div></div>
+
 <div class="modal-overlay" id="costModal"><div class="modal"><div class="modal-header"><h3>📊 ต้นทุนเดือนนี้</h3><button class="modal-close" onclick="closeModal('costModal')">✕</button></div><div class="modal-body" id="costBreakdownBody"></div></div></div>
 
 <div class="print-report" id="printReport"></div>
 <div class="toast" id="toast"></div>
 
 <script>
-const CATEGORIES = {
+const DEFAULT_CATEGORIES = {
   expense: [
     { id: 'banana', name: 'กล้วย (วัตถุดิบหลัก)', icon: '🍌' },
     { id: 'seasoning', name: 'เครื่องปรุง', icon: '🧂' },
@@ -400,6 +407,120 @@ const CATEGORIES = {
     { id: 'online', name: 'ขายออนไลน์', icon: '📱' }
   ]
 };
+let CATEGORIES = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+
+const EMOJI_LIST = ['📦','🏪','📱','🍌','🧂','🫗','🛍️','⛽','🔥','👷','🏦','💰','🛒','🚗','📋','🔧','💡','🏠','📞','🎁','✂️','🧹','💊','🍽️','🧊','🥤','🍳','🧤','📐','🪣'];
+
+async function loadCustomCategories() {
+  try {
+    const doc = await dbGet('settings', 'customCategories');
+    if (doc && doc.value) {
+      const custom = JSON.parse(doc.value);
+      CATEGORIES = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+      if (custom.expense) CATEGORIES.expense = [...CATEGORIES.expense.filter(c=>c.id!=='other_exp'), ...custom.expense, ...CATEGORIES.expense.filter(c=>c.id==='other_exp')];
+      if (custom.income) CATEGORIES.income = [...CATEGORIES.income, ...custom.income];
+    }
+  } catch(e) { console.log('Load custom categories:', e); }
+}
+
+async function saveCustomCategories(custom) {
+  await dbAdd('settings', { key: 'customCategories', value: JSON.stringify(custom) });
+  await loadCustomCategories();
+  updateCategoryOptions();
+}
+
+function getCustomCategories() {
+  const defaultIds = { expense: DEFAULT_CATEGORIES.expense.map(c=>c.id), income: DEFAULT_CATEGORIES.income.map(c=>c.id) };
+  return {
+    expense: CATEGORIES.expense.filter(c => !defaultIds.expense.includes(c.id)),
+    income: CATEGORIES.income.filter(c => !defaultIds.income.includes(c.id))
+  };
+}
+
+function openCategoryManager() {
+  renderCategoryManager();
+  openModal('categoryModal');
+}
+
+function renderCategoryManager() {
+  const custom = getCustomCategories();
+  let h = '<div style="margin-bottom:20px">';
+  h += '<h4 style="font-size:15px;font-weight:600;color:var(--expense);margin-bottom:10px">💸 หมวดรายจ่าย</h4>';
+  // Default categories (non-deletable)
+  DEFAULT_CATEGORIES.expense.forEach(c => {
+    h += `<div style="display:flex;align-items:center;padding:8px 12px;background:var(--primary-50);border-radius:var(--radius-sm);margin-bottom:6px"><span style="font-size:20px;margin-right:10px">${c.icon}</span><span style="flex:1;font-size:14px">${c.name}</span><span style="font-size:11px;color:var(--text-muted);background:var(--border);padding:2px 8px;border-radius:6px">ค่าเริ่มต้น</span></div>`;
+  });
+  // Custom expense categories
+  custom.expense.forEach(c => {
+    h += `<div style="display:flex;align-items:center;padding:8px 12px;background:var(--expense-light);border-radius:var(--radius-sm);margin-bottom:6px"><span style="font-size:20px;margin-right:10px">${c.icon}</span><span style="flex:1;font-size:14px;font-weight:500">${c.name}</span><button onclick="deleteCustomCategory('expense','${c.id}')" style="background:none;border:none;color:var(--expense);font-size:18px;cursor:pointer;padding:4px 8px">✕</button></div>`;
+  });
+  h += `<button onclick="showAddCategory('expense')" class="btn btn-outline btn-sm" style="width:100%;margin-top:6px">+ เพิ่มหมวดรายจ่าย</button>`;
+  h += '</div>';
+
+  h += '<div>';
+  h += '<h4 style="font-size:15px;font-weight:600;color:var(--income);margin-bottom:10px">💰 หมวดรายรับ</h4>';
+  DEFAULT_CATEGORIES.income.forEach(c => {
+    h += `<div style="display:flex;align-items:center;padding:8px 12px;background:var(--primary-50);border-radius:var(--radius-sm);margin-bottom:6px"><span style="font-size:20px;margin-right:10px">${c.icon}</span><span style="flex:1;font-size:14px">${c.name}</span><span style="font-size:11px;color:var(--text-muted);background:var(--border);padding:2px 8px;border-radius:6px">ค่าเริ่มต้น</span></div>`;
+  });
+  custom.income.forEach(c => {
+    h += `<div style="display:flex;align-items:center;padding:8px 12px;background:var(--income-light);border-radius:var(--radius-sm);margin-bottom:6px"><span style="font-size:20px;margin-right:10px">${c.icon}</span><span style="flex:1;font-size:14px;font-weight:500">${c.name}</span><button onclick="deleteCustomCategory('income','${c.id}')" style="background:none;border:none;color:var(--expense);font-size:18px;cursor:pointer;padding:4px 8px">✕</button></div>`;
+  });
+  h += `<button onclick="showAddCategory('income')" class="btn btn-outline btn-sm" style="width:100%;margin-top:6px">+ เพิ่มหมวดรายรับ</button>`;
+  h += '</div>';
+
+  // Add form (hidden by default)
+  h += `<div id="addCatForm" style="display:none;margin-top:16px;padding:16px;background:var(--primary-50);border-radius:var(--radius-sm)">
+    <h4 style="font-size:14px;font-weight:600;margin-bottom:10px" id="addCatTitle">เพิ่มหมวดหมู่</h4>
+    <input type="hidden" id="addCatType">
+    <div class="form-group" style="margin-bottom:10px"><label class="form-label" style="font-size:13px">ชื่อหมวดหมู่</label><input type="text" class="form-input" id="addCatName" placeholder="เช่น ค่าไฟ, ค่าเช่า"></div>
+    <div class="form-group" style="margin-bottom:10px"><label class="form-label" style="font-size:13px">เลือกไอคอน</label>
+    <div id="emojiPicker" style="display:flex;flex-wrap:wrap;gap:6px">${EMOJI_LIST.map(e=>`<button onclick="pickEmoji('${e}')" class="emoji-pick" style="width:36px;height:36px;border:2px solid var(--border);border-radius:8px;background:#fff;font-size:18px;cursor:pointer;transition:all .2s">${e}</button>`).join('')}</div>
+    <input type="hidden" id="addCatEmoji" value="📦">
+    </div>
+    <div style="display:flex;gap:8px"><button onclick="confirmAddCategory()" class="btn btn-primary btn-sm" style="flex:1">บันทึก</button><button onclick="document.getElementById('addCatForm').style.display='none'" class="btn btn-outline btn-sm" style="flex:1">ยกเลิก</button></div>
+  </div>`;
+
+  document.getElementById('categoryModalBody').innerHTML = h;
+}
+
+function pickEmoji(e) {
+  document.getElementById('addCatEmoji').value = e;
+  document.querySelectorAll('.emoji-pick').forEach(b => b.style.borderColor = 'var(--border)');
+  document.querySelectorAll('.emoji-pick').forEach(b => { if(b.textContent.trim()===e) b.style.borderColor = 'var(--primary)'; });
+}
+
+function showAddCategory(type) {
+  document.getElementById('addCatForm').style.display = 'block';
+  document.getElementById('addCatType').value = type;
+  document.getElementById('addCatName').value = '';
+  document.getElementById('addCatEmoji').value = '📦';
+  document.getElementById('addCatTitle').textContent = type==='expense' ? '➕ เพิ่มหมวดรายจ่าย' : '➕ เพิ่มหมวดรายรับ';
+  document.querySelectorAll('.emoji-pick').forEach(b => b.style.borderColor = 'var(--border)');
+  document.getElementById('addCatForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function confirmAddCategory() {
+  const type = document.getElementById('addCatType').value;
+  const name = document.getElementById('addCatName').value.trim();
+  const icon = document.getElementById('addCatEmoji').value;
+  if (!name) { showToast('กรุณาใส่ชื่อหมวดหมู่'); return; }
+  const id = 'custom_' + Date.now();
+  const custom = getCustomCategories();
+  if (!custom[type]) custom[type] = [];
+  custom[type].push({ id, name, icon });
+  await saveCustomCategories(custom);
+  showToast('เพิ่มหมวดหมู่สำเร็จ!');
+  renderCategoryManager();
+}
+
+async function deleteCustomCategory(type, id) {
+  if (!confirm('ลบหมวดหมู่นี้?')) return;
+  const custom = getCustomCategories();
+  custom[type] = custom[type].filter(c => c.id !== id);
+  await saveCustomCategories(custom);
+  showToast('ลบหมวดหมู่แล้ว');
+  renderCategoryManager();
+}
 
 const FLAVORS = [
   { id: 'paprika', name: 'ปาปริก้า' },
@@ -1183,6 +1304,7 @@ document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click
 // ===== Init =====
 async function initApp() {
   document.getElementById('dateInput').value = getToday();
+  await loadCustomCategories();
   updateCategoryOptions(); buildFlavorGrid();
   const s=await getSettings();
   if(s.businessName)document.querySelector('.header-title span:last-child').textContent=s.businessName;
@@ -1197,37 +1319,6 @@ auth.onAuthStateChanged(user => {
   document.getElementById('loginOverlay').style.display = user ? 'none' : 'flex';
   if (user) initApp();
 });
-
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    console.log('SW registered:', reg.scope);
-  }).catch(err => console.log('SW failed:', err));
-}
-
-// PWA Install prompt
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  // Show install banner
-  const banner = document.createElement('div');
-  banner.id = 'installBanner';
-  banner.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;background:linear-gradient(135deg,#D97706,#B45309);color:#fff;padding:14px 16px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;z-index:300;box-shadow:0 4px 20px rgba(217,119,6,.4);font-family:Prompt,sans-serif;animation:slideUp .3s ease';
-  banner.innerHTML = '<div style="flex:1"><div style="font-weight:600;font-size:14px">📲 ติดตั้งแอปลงมือถือ</div><div style="font-size:12px;opacity:.9;margin-top:2px">เปิดใช้งานได้เหมือนแอปจริง</div></div><button onclick="installPWA()" style="background:#fff;color:#D97706;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:Prompt,sans-serif">ติดตั้ง</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;margin-left:8px;padding:4px">✕</button>';
-  document.body.appendChild(banner);
-});
-
-function installPWA() {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(result => {
-    if (result.outcome === 'accepted') showToast('ติดตั้งแอปสำเร็จ!');
-    deferredPrompt = null;
-    const b = document.getElementById('installBanner');
-    if (b) b.remove();
-  });
-}
 </script>
 </body>
 </html>
