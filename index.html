@@ -252,6 +252,7 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
     <div class="summary-card" onclick="showCostBreakdown()" style="cursor:pointer"><div class="summary-label">รายจ่ายเดือนนี้ <span style="font-size:14px">📊</span></div><div class="summary-value expense" id="monthExpense">฿0</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">แตะเพื่อดูแยกหมวด</div></div>
     <div class="summary-card full-width"><div class="summary-label">กำไร (ขาดทุน) เดือนนี้</div><div class="summary-value" id="monthProfit">฿0</div><div class="summary-sub" id="monthProfitSub"></div></div>
   </div>
+  <button onclick="switchPage('cost')" style="width:100%;padding:12px 16px;border:2px solid var(--primary);background:var(--primary-50);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:600;color:var(--primary-dark);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;transition:all .2s">🧮 วิเคราะห์ต้นทุน &amp; กำไรต่อซอง</button>
   <div class="card"><div class="section-title"><span>รายการวันนี้</span><span class="section-link" id="todaySummary"></span></div><div id="todayTransactions"></div></div>
   <div class="card chart-section">
     <div class="section-title"><span>🍌 สถิติยอดขายตามรสชาติ</span></div>
@@ -328,6 +329,54 @@ body{font-family:'Prompt','Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif
   <div class="card" id="reportContent"><div class="empty-state"><div class="emoji">📊</div><p>เลือกช่วงเวลาเพื่อดูรีพอร์ต</p></div></div>
   <div class="report-actions" id="reportActions" style="display:none"><button class="btn btn-success" onclick="exportReportExcel()">📊 ส่งออก Excel</button><button class="btn btn-primary" onclick="printReport()">🖨 พิมพ์ PDF</button></div>
 </div>
+
+<!-- Cost Analysis Page -->
+<div id="pageCost" class="page">
+  <div class="card" style="padding-bottom:0">
+    <div class="type-toggle" style="margin-bottom:0">
+      <button class="type-btn expense active" id="costTab1" onclick="switchCostTab('analysis')" style="border-radius:var(--radius-sm) var(--radius-sm) 0 0">🧮 วิเคราะห์ต้นทุน</button>
+      <button class="type-btn income" id="costTab2" onclick="switchCostTab('batch')" style="border-radius:var(--radius-sm) var(--radius-sm) 0 0">🏭 รอบการผลิต</button>
+    </div>
+  </div>
+
+  <!-- Analysis Tab -->
+  <div id="costTabAnalysis">
+    <div class="card">
+      <div class="report-selector">
+        <select class="form-select" id="costMonth" onchange="loadCostAnalysis()"></select>
+        <select class="form-select" id="costYear" onchange="loadCostAnalysis()"></select>
+      </div>
+    </div>
+    <div id="costAnalysisContent"><div class="empty-state"><div class="emoji">🧮</div><p>กำลังโหลดข้อมูล...</p></div></div>
+  </div>
+
+  <!-- Batch Tab -->
+  <div id="costTabBatch" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <div style="font-size:13px;color:var(--text-muted)">สต็อกคงเหลือ</div>
+          <div style="font-size:28px;font-weight:700;color:var(--primary-dark)" id="currentStock">0 ซอง</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openBatchModal()" style="width:auto;padding:10px 20px">+ เพิ่มรอบผลิต</button>
+      </div>
+    </div>
+    <div id="batchList"><div class="empty-state"><div class="emoji">🏭</div><p>ยังไม่มีรอบการผลิต</p></div></div>
+  </div>
+
+  <button onclick="switchPage('dashboard')" class="btn btn-outline" style="margin:16px 0">← กลับหน้าหลัก</button>
+</div>
+
+<!-- Batch Modal -->
+<div class="modal-overlay" id="batchModal"><div class="modal"><div class="modal-header"><h3 id="batchModalTitle">🏭 เพิ่มรอบการผลิต</h3><button class="modal-close" onclick="closeModal('batchModal')">✕</button></div><div class="modal-body">
+  <input type="hidden" id="editBatchId" value="">
+  <div class="form-group"><label class="form-label">วันที่ผลิต</label><input type="date" class="form-input" id="batchDate"></div>
+  <div class="form-group"><label class="form-label">ต้นทุนรอบนี้ (บาท)</label><input type="number" class="form-input" id="batchCost" placeholder="รวมค่ากล้วย เครื่องปรุง น้ำมัน ฯลฯ" min="0" inputmode="decimal"><div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 รวมทุกค่าใช้จ่ายในรอบนี้</div></div>
+  <div class="form-group"><label class="form-label">ผลผลิตได้ (กิโลกรัม)</label><input type="number" class="form-input" id="batchYieldKg" placeholder="0" min="0" step="0.1" inputmode="decimal"></div>
+  <div class="form-group"><label class="form-label">ทำขนมได้ (ซอง)</label><input type="number" class="form-input" id="batchBags" placeholder="0" min="0" inputmode="numeric"></div>
+  <div class="form-group"><label class="form-label">หมายเหตุ</label><textarea class="form-textarea" id="batchNotes" placeholder="เช่น กล้วยน้ำว้า 50 หวี ทอด 2 วัน" rows="2"></textarea></div>
+  <button class="btn btn-primary" onclick="saveBatch()" id="saveBatchBtn">บันทึกรอบผลิต</button>
+</div></div></div>
 
 <!-- Bottom Nav -->
 <nav class="bottom-nav">
@@ -641,6 +690,7 @@ function switchPage(page) {
   if (page === 'list') loadTransactionList();
   if (page === 'report') initReportSelectors();
   if (page === 'loan') loadLoans();
+  if (page === 'cost') initCostSelectors();
 }
 
 // ===== Flavor Grid =====
@@ -814,6 +864,7 @@ async function showDetail(id) {
   }
   if (tx.photo) h += `<img src="${tx.photo}" class="detail-photo" onclick="viewPhoto(${id})">`;
   document.getElementById('detailBody').innerHTML = h;
+  document.querySelector('#detailModal .modal-footer').style.display = 'flex';
   openModal('detailModal');
 }
 
@@ -1091,6 +1142,356 @@ async function exportReportExcel() {
   XLSX.utils.book_append_sheet(wb, ws3, 'สถิติรสชาติ');
   XLSX.writeFile(wb, biz+'_รีพอร์ต_'+d.periodLabel.replace(/ /g,'_')+'.xlsx');
   showToast('ส่งออก Excel สำเร็จ!');
+}
+
+// ===== Cost Tabs =====
+function switchCostTab(tab) {
+  document.getElementById('costTabAnalysis').style.display = tab === 'analysis' ? 'block' : 'none';
+  document.getElementById('costTabBatch').style.display = tab === 'batch' ? 'block' : 'none';
+  document.getElementById('costTab1').classList.toggle('active', tab === 'analysis');
+  document.getElementById('costTab2').classList.toggle('active', tab === 'batch');
+  if (tab === 'batch') loadBatches();
+}
+
+// ===== Production Batches =====
+async function loadBatches() {
+  const batches = await dbGetAll('batches');
+  batches.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+  // Calculate running stock
+  const sorted = [...batches].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+  let stock = 0;
+  sorted.forEach(b => {
+    b._stockBefore = stock;
+    stock += (b.bags || 0) - (b.sold || 0);
+    b._stockAfter = stock;
+  });
+
+  document.getElementById('currentStock').textContent = stock + ' ซอง';
+
+  if (!batches.length) {
+    document.getElementById('batchList').innerHTML = '<div class="card"><div class="empty-state"><div class="emoji">🏭</div><p>ยังไม่มีรอบการผลิต<br><span style="font-size:13px;color:var(--text-muted)">กด "+ เพิ่มรอบผลิต" เพื่อเริ่มบันทึก</span></p></div></div>';
+    return;
+  }
+
+  let h = '';
+  batches.forEach(b => {
+    const costPerBag = b.bags > 0 ? b.cost / b.bags : 0;
+    const costPerKg = b.yieldKg > 0 ? b.cost / b.yieldKg : 0;
+    const bagsPerKg = b.yieldKg > 0 ? b.bags / b.yieldKg : 0;
+    h += `<div class="card" style="margin-bottom:12px;border-left:4px solid var(--primary)" onclick="viewBatchDetail(${b.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--primary-dark)">🏭 รอบ ${fmtDate(b.date)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${b.notes||''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--text-muted)">ต้นทุน/ซอง</div>
+          <div style="font-size:20px;font-weight:700;color:var(--expense)">฿${costPerBag.toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+        <div style="background:var(--expense-light);padding:8px;border-radius:8px;text-align:center">
+          <div style="color:var(--expense);font-weight:500">ลงทุน</div>
+          <div style="font-weight:700;font-size:14px">฿${fmt(b.cost)}</div>
+        </div>
+        <div style="background:var(--primary-50);padding:8px;border-radius:8px;text-align:center">
+          <div style="color:var(--primary-dark);font-weight:500">ผลผลิต</div>
+          <div style="font-weight:700;font-size:14px">${b.yieldKg} กก.</div>
+        </div>
+        <div style="background:var(--income-light);padding:8px;border-radius:8px;text-align:center">
+          <div style="color:var(--income);font-weight:500">ได้ขนม</div>
+          <div style="font-weight:700;font-size:14px">${fmt(b.bags)} ซอง</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+        <span>ต้นทุน/กก.: ฿${costPerKg.toFixed(2)}</span>
+        <span>${bagsPerKg.toFixed(1)} ซอง/กก.</span>
+        <span>ขายแล้ว: ${b.sold||0} ซอง</span>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('batchList').innerHTML = h;
+}
+
+function openBatchModal(editId) {
+  document.getElementById('editBatchId').value = editId || '';
+  document.getElementById('batchModalTitle').textContent = editId ? '✏ แก้ไขรอบผลิต' : '🏭 เพิ่มรอบการผลิต';
+  document.getElementById('saveBatchBtn').textContent = editId ? 'บันทึกการแก้ไข' : 'บันทึกรอบผลิต';
+  if (!editId) {
+    document.getElementById('batchDate').value = getToday();
+    document.getElementById('batchCost').value = '';
+    document.getElementById('batchYieldKg').value = '';
+    document.getElementById('batchBags').value = '';
+    document.getElementById('batchNotes').value = '';
+  }
+  openModal('batchModal');
+}
+
+async function saveBatch() {
+  const id = document.getElementById('editBatchId').value;
+  const cost = parseFloat(document.getElementById('batchCost').value);
+  const yieldKg = parseFloat(document.getElementById('batchYieldKg').value);
+  const bags = parseInt(document.getElementById('batchBags').value);
+  const date = document.getElementById('batchDate').value;
+  const notes = document.getElementById('batchNotes').value.trim();
+
+  if (!date || !cost || cost <= 0) { showToast('กรุณาใส่วันที่และต้นทุน'); return; }
+  if (!bags || bags <= 0) { showToast('กรุณาใส่จำนวนซอง'); return; }
+
+  const data = { date, cost, yieldKg: yieldKg || 0, bags, sold: 0, notes };
+
+  if (id) {
+    const old = await dbGet('batches', parseInt(id));
+    data.sold = old ? old.sold : 0;
+    data.id = parseInt(id);
+    await dbPut('batches', data);
+    showToast('แก้ไขรอบผลิตสำเร็จ');
+  } else {
+    await dbAdd('batches', data);
+    showToast('บันทึกรอบผลิตสำเร็จ!');
+  }
+  closeModal('batchModal');
+  loadBatches();
+}
+
+async function viewBatchDetail(id) {
+  const b = await dbGet('batches', id);
+  if (!b) return;
+  const costPerBag = b.bags > 0 ? b.cost / b.bags : 0;
+  const costPerKg = b.yieldKg > 0 ? b.cost / b.yieldKg : 0;
+  const remaining = b.bags - (b.sold || 0);
+
+  let h = `<div style="text-align:center;margin-bottom:16px">
+    <div style="font-size:16px;font-weight:700;color:var(--primary-dark)">รอบผลิต ${fmtDateFull(b.date)}</div>
+    ${b.notes ? `<div style="font-size:13px;color:var(--text-muted);margin-top:4px">${b.notes}</div>` : ''}
+  </div>`;
+
+  h += `<table class="report-table" style="margin-bottom:16px">
+    <tr><td>💰 ต้นทุนรวม</td><td style="font-weight:700;color:var(--expense)">฿${fmt(b.cost)}</td></tr>
+    <tr><td>⚖ ผลผลิต</td><td style="font-weight:700">${b.yieldKg} กก.</td></tr>
+    <tr><td>📦 ทำขนมได้</td><td style="font-weight:700">${fmt(b.bags)} ซอง</td></tr>
+    <tr><td>🛒 ขายแล้ว</td><td style="font-weight:700;color:var(--income)">${fmt(b.sold||0)} ซอง</td></tr>
+    <tr style="background:var(--primary-50)"><td style="font-weight:700">📊 คงเหลือ</td><td style="font-weight:700;color:var(--primary-dark)">${fmt(remaining)} ซอง</td></tr>
+  </table>`;
+
+  h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="background:var(--expense-light);padding:12px;border-radius:var(--radius-sm);text-align:center">
+      <div style="font-size:11px;color:var(--expense)">ต้นทุน/ซอง</div>
+      <div style="font-size:20px;font-weight:700;color:var(--expense)">฿${costPerBag.toFixed(2)}</div>
+    </div>
+    <div style="background:var(--primary-50);padding:12px;border-radius:var(--radius-sm);text-align:center">
+      <div style="font-size:11px;color:var(--primary-dark)">ต้นทุน/กก.</div>
+      <div style="font-size:20px;font-weight:700;color:var(--primary-dark)">฿${costPerKg.toFixed(2)}</div>
+    </div>
+  </div>`;
+
+  // Sold update
+  h += `<div style="background:#F9FAFB;padding:14px;border-radius:var(--radius-sm);margin-bottom:16px">
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">🛒 อัปเดตจำนวนที่ขายไปแล้ว</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" class="form-input" id="batchSoldInput" value="${b.sold||0}" min="0" max="${b.bags}" inputmode="numeric" style="flex:1">
+      <span style="font-size:13px;color:var(--text-muted)">/ ${b.bags} ซอง</span>
+    </div>
+    <button onclick="updateBatchSold(${b.id},${b.bags})" class="btn btn-success btn-sm" style="margin-top:8px;width:100%">💾 บันทึกยอดขาย</button>
+  </div>`;
+
+  // Action buttons
+  h += `<div style="display:flex;gap:8px">
+    <button onclick="closeModal('detailModal');editBatch(${b.id})" class="btn btn-outline btn-sm" style="flex:1">✏ แก้ไข</button>
+    <button onclick="deleteBatch(${b.id})" class="btn btn-danger btn-sm" style="flex:1">🗑 ลบ</button>
+  </div>`;
+
+  document.getElementById('detailTitle').textContent = '🏭 รอบการผลิต';
+  document.getElementById('detailBody').innerHTML = h;
+  document.querySelector('#detailModal .modal-footer').style.display = 'none';
+  openModal('detailModal');
+}
+
+async function updateBatchSold(id, maxBags) {
+  const sold = parseInt(document.getElementById('batchSoldInput').value) || 0;
+  if (sold < 0 || sold > maxBags) { showToast('จำนวนไม่ถูกต้อง'); return; }
+  const b = await dbGet('batches', id);
+  b.sold = sold;
+  await dbPut('batches', b);
+  showToast('อัปเดตยอดขายสำเร็จ');
+  closeModal('detailModal');
+  loadBatches();
+}
+
+async function editBatch(id) {
+  const b = await dbGet('batches', id);
+  if (!b) return;
+  document.getElementById('editBatchId').value = b.id;
+  document.getElementById('batchDate').value = b.date;
+  document.getElementById('batchCost').value = b.cost;
+  document.getElementById('batchYieldKg').value = b.yieldKg;
+  document.getElementById('batchBags').value = b.bags;
+  document.getElementById('batchNotes').value = b.notes || '';
+  document.getElementById('batchModalTitle').textContent = '✏ แก้ไขรอบผลิต';
+  document.getElementById('saveBatchBtn').textContent = 'บันทึกการแก้ไข';
+  openModal('batchModal');
+}
+
+async function deleteBatch(id) {
+  if (!confirm('ลบรอบผลิตนี้?')) return;
+  await dbDelete('batches', id);
+  showToast('ลบรอบผลิตแล้ว');
+  closeModal('detailModal');
+  loadBatches();
+}
+
+// ===== Cost Analysis =====
+function initCostSelectors() {
+  const now = new Date();
+  const mSel = document.getElementById('costMonth');
+  const ySel = document.getElementById('costYear');
+  if (!mSel.options.length) {
+    mSel.innerHTML = MONTH_NAMES.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+    const curY = now.getFullYear();
+    for (let y = curY; y >= curY - 3; y--) ySel.innerHTML += `<option value="${y}">${y+543}</option>`;
+  }
+  mSel.value = now.getMonth();
+  ySel.value = now.getFullYear();
+  loadCostAnalysis();
+}
+
+async function loadCostAnalysis() {
+  const year = parseInt(document.getElementById('costYear').value);
+  const month = parseInt(document.getElementById('costMonth').value);
+  const pfx = year + '-' + String(month+1).padStart(2,'0');
+  const periodLabel = MONTH_NAMES[month] + ' ' + (year+543);
+
+  allTransactions = allTransactions.length ? allTransactions : await dbGetAll('transactions');
+  const filtered = allTransactions.filter(t => t.date.startsWith(pfx));
+
+  if (!filtered.length) {
+    document.getElementById('costAnalysisContent').innerHTML = `<div class="card"><div class="empty-state"><div class="emoji">🧮</div><p>ไม่มีข้อมูลในเดือน${periodLabel}</p></div></div>`;
+    return;
+  }
+
+  // Calculate
+  let totExpense = 0, totIncome = 0, totalBags = 0;
+  const expByCat = {};
+  filtered.forEach(tx => {
+    if (tx.type === 'expense') {
+      totExpense += tx.amount;
+      const cat = getCat('expense', tx.category);
+      expByCat[tx.category] = expByCat[tx.category] || { name: cat.name, icon: cat.icon, total: 0 };
+      expByCat[tx.category].total += tx.amount;
+    } else {
+      totIncome += tx.amount;
+      if (tx.flavors) tx.flavors.forEach(f => { totalBags += (f.qty5||0) + (f.qty10||0); });
+    }
+  });
+
+  const profit = totIncome - totExpense;
+  const costPerBag = totalBags > 0 ? totExpense / totalBags : 0;
+  const revenuePerBag = totalBags > 0 ? totIncome / totalBags : 0;
+  const profitPerBag = revenuePerBag - costPerBag;
+  const margin = totIncome > 0 ? (profit / totIncome) * 100 : 0;
+
+  let h = '';
+
+  // Summary cards
+  h += `<div class="summary-grid" style="margin-bottom:16px">
+    <div class="summary-card" style="border-left:4px solid var(--expense)"><div class="summary-label">ต้นทุนรวม</div><div class="summary-value expense">฿${fmt(totExpense)}</div></div>
+    <div class="summary-card" style="border-left:4px solid var(--income)"><div class="summary-label">รายรับรวม</div><div class="summary-value income">฿${fmt(totIncome)}</div></div>
+    <div class="summary-card" style="border-left:4px solid var(--primary)"><div class="summary-label">จำนวนซองที่ขาย</div><div class="summary-value">${fmt(totalBags)} ซอง</div></div>
+    <div class="summary-card" style="border-left:4px solid ${profit>=0?'var(--income)':'var(--expense)'}"><div class="summary-label">กำไรสุทธิ</div><div class="summary-value ${profit>=0?'profit':'loss'}">${profit>=0?'+':''}฿${fmt(profit)}</div></div>
+  </div>`;
+
+  // Per-bag analysis
+  if (totalBags > 0) {
+    h += `<div class="card" style="margin-bottom:16px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">📦 วิเคราะห์ต่อซอง</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--expense-light);padding:14px;border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:12px;color:var(--expense);font-weight:500">ต้นทุน/ซอง</div>
+          <div style="font-size:22px;font-weight:700;color:var(--expense);margin-top:4px">฿${costPerBag.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--income-light);padding:14px;border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:12px;color:var(--income);font-weight:500">ราคาขายเฉลี่ย/ซอง</div>
+          <div style="font-size:22px;font-weight:700;color:var(--income);margin-top:4px">฿${revenuePerBag.toFixed(2)}</div>
+        </div>
+        <div style="background:${profitPerBag>=0?'var(--income-light)':'var(--expense-light)'};padding:14px;border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:12px;color:${profitPerBag>=0?'var(--income)':'var(--expense)'};font-weight:500">กำไร/ซอง</div>
+          <div style="font-size:22px;font-weight:700;color:${profitPerBag>=0?'var(--income)':'var(--expense)'};margin-top:4px">${profitPerBag>=0?'+':''}฿${profitPerBag.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--primary-50);padding:14px;border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:12px;color:var(--primary-dark);font-weight:500">อัตรากำไร</div>
+          <div style="font-size:22px;font-weight:700;color:var(--primary-dark);margin-top:4px">${margin.toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Cost breakdown by category with bar chart
+  const catArr = Object.values(expByCat).sort((a,b) => b.total - a.total);
+  if (catArr.length) {
+    const maxCat = catArr[0].total;
+    h += `<div class="card" style="margin-bottom:16px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">📊 สัดส่วนต้นทุนแยกหมวด</h3>`;
+    catArr.forEach(c => {
+      const pct = totExpense > 0 ? (c.total / totExpense * 100) : 0;
+      const barW = maxCat > 0 ? Math.max((c.total / maxCat) * 100, 3) : 0;
+      h += `<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:500">${c.icon} ${c.name}</span>
+          <span style="font-size:13px;font-weight:600;color:var(--expense)">฿${fmt(c.total)} <span style="font-size:11px;color:var(--text-muted)">(${pct.toFixed(1)}%)</span></span>
+        </div>
+        <div style="height:8px;background:#F3F4F6;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,var(--expense),#EF4444);border-radius:4px;transition:width .5s ease"></div>
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+  }
+
+  // Monthly comparison (last 3 months)
+  h += `<div class="card" style="margin-bottom:16px">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">📈 เปรียบเทียบ 3 เดือนล่าสุด</h3>`;
+  const compareData = [];
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(year, month - i, 1);
+    const p = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const label = MONTH_SHORT[d.getMonth()] + ' ' + (d.getFullYear()+543).toString().slice(-2);
+    let mExp = 0, mInc = 0, mBags = 0;
+    allTransactions.filter(t => t.date.startsWith(p)).forEach(t => {
+      if (t.type === 'expense') mExp += t.amount;
+      else { mInc += t.amount; if (t.flavors) t.flavors.forEach(f => { mBags += (f.qty5||0) + (f.qty10||0); }); }
+    });
+    compareData.push({ label, exp: mExp, inc: mInc, bags: mBags, profit: mInc - mExp, costPerBag: mBags > 0 ? mExp / mBags : 0 });
+  }
+  compareData.reverse();
+  const maxBar = Math.max(...compareData.map(d => Math.max(d.exp, d.inc)), 1);
+
+  compareData.forEach(d => {
+    const expW = (d.exp / maxBar * 100).toFixed(1);
+    const incW = (d.inc / maxBar * 100).toFixed(1);
+    h += `<div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">${d.label}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span style="font-size:11px;width:45px;color:var(--expense);flex-shrink:0">ต้นทุน</span>
+        <div style="flex:1;height:14px;background:#F3F4F6;border-radius:4px;overflow:hidden"><div style="height:100%;width:${expW}%;background:var(--expense);border-radius:4px"></div></div>
+        <span style="font-size:12px;font-weight:600;width:75px;text-align:right;color:var(--expense)">฿${fmt(d.exp)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span style="font-size:11px;width:45px;color:var(--income);flex-shrink:0">รายรับ</span>
+        <div style="flex:1;height:14px;background:#F3F4F6;border-radius:4px;overflow:hidden"><div style="height:100%;width:${incW}%;background:var(--income);border-radius:4px"></div></div>
+        <span style="font-size:12px;font-weight:600;width:75px;text-align:right;color:var(--income)">฿${fmt(d.inc)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:2px">
+        <span>ขาย ${fmt(d.bags)} ซอง</span>
+        <span>ต้นทุน/ซอง: ฿${d.costPerBag.toFixed(2)}</span>
+        <span style="color:${d.profit>=0?'var(--income)':'var(--expense)'};font-weight:600">กำไร: ${d.profit>=0?'+':''}฿${fmt(d.profit)}</span>
+      </div>
+    </div>`;
+  });
+  h += '</div>';
+
+  document.getElementById('costAnalysisContent').innerHTML = h;
 }
 
 // ===== Settings =====
